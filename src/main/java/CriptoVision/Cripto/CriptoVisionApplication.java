@@ -8,7 +8,7 @@ public class CriptoVisionApplication {
     public static void main(String[] args) {
         SpringApplication.run(CriptoVisionApplication.class, args);
 
-		System.out.println("Teste");
+		System.out.println("Subiu!!!");
     }
 
 }
