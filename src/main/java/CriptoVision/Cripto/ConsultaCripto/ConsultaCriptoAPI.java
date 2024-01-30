@@ -1,5 +1,7 @@
 package CriptoVision.Cripto.ConsultaCripto;
 
+import CriptoVision.Cripto.domain.Moeda;
+import CriptoVision.Cripto.domain.Moedas;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.nodes.Document;
@@ -15,6 +17,8 @@ import org.springframework.web.client.RestTemplate;
 import org.jsoup.Jsoup;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("consulta-cripto")
@@ -23,7 +27,7 @@ public class ConsultaCriptoAPI {
     Logger log = LoggerFactory.getLogger(ConsultaCriptoAPI.class);
 
     @GetMapping(value = "/listaCriptos")
-    public String getListaCriptos(@RequestHeader(value = "X-CMC_PRO_API_KEY") String chaveCoinMkt ){
+    public Moedas getListaCriptos(@RequestHeader(value = "X-CMC_PRO_API_KEY") String chaveCoinMkt ){
         log.info("Entrada no EP de Lista de Criptos");
 
         String url = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest";
@@ -39,17 +43,27 @@ public class ConsultaCriptoAPI {
 
         // Converte o conteúdo em JSON
         JSONObject json = new JSONObject(conteudo);
-
         JSONArray data = json.getJSONArray("data");
-        JSONObject primeiroObjeto = data.getJSONObject(0);
 
-        String moeda = primeiroObjeto.getString("name");
-        BigDecimal volume24h = primeiroObjeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("volume_24h");
-        BigDecimal percent1h = primeiroObjeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("percent_change_1h");;
-        System.out.println("Valores:\nMoeda: " + moeda + "\nVolume 24h: " + volume24h + "\nPercentual 1h: " + percent1h);
+        Moedas moedas = new Moedas();
+        List<Moeda> moedasTeste = new ArrayList<>();
 
-//        return new ResponseEntity(response.getBody(), HttpStatus.OK);
-        return json.toString();
+        for(int i = 0; i < data.length(); i++){
+            Moeda moeda = new Moeda();
+            JSONObject objeto = data.getJSONObject(i);
+
+            moeda.setNome(objeto.getString("name"));
+            moeda.setPrecoAtual(objeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("price"));
+            moeda.setUltimaHora(objeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("percent_change_1h"));
+            moeda.setVinteQuatroHoras(objeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("percent_change_24h"));
+            moeda.setSeteDias(objeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("percent_change_7d"));
+            moeda.setTrintaDias(objeto.getJSONObject("quote").getJSONObject("USD").getBigDecimal("percent_change_30d"));
+
+            moedasTeste.add(moeda);
+        }
+        moedas.setMoedas(moedasTeste);
+
+        return moedas;
     }
 
 }
