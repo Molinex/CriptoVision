@@ -18,11 +18,11 @@ public class Variacao {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
     String nomeCripto;
     BigDecimal precoBase;
-    Double variacaoBase;
-    Double valorAlerta;
+    BigDecimal variacaoBase;
+    BigDecimal valorAlerta;
 
     public String getNomeCripto() {
         return nomeCripto;
@@ -40,19 +40,38 @@ public class Variacao {
         this.precoBase = precoBase;
     }
 
-    public Double getVariacaoBase() {
+    public BigDecimal getVariacaoBase() {
         return variacaoBase;
     }
 
-    public void setVariacaoBase(Double variacaoBase) {
+    public void setVariacaoBase(BigDecimal variacaoBase) {
         this.variacaoBase = variacaoBase;
     }
 
-    public Double getValorAlerta() {
+    public BigDecimal getValorAlerta() {
         return valorAlerta;
     }
 
-    public void setValorAlerta(Double valorAlerta) {
+    public void setValorAlerta(BigDecimal valorAlerta) {
         this.valorAlerta = valorAlerta;
+    }
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
+
+    @Override
+    public String toString() {
+        return "Variacao{" +
+                "id=" + id +
+                ", nomeCripto='" + nomeCripto + '\'' +
+                ", precoBase=" + precoBase +
+                ", variacaoBase=" + variacaoBase +
+                ", valorAlerta=" + valorAlerta +
+                '}';
     }
 }

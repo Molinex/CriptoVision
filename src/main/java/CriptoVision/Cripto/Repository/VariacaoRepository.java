@@ -1,9 +1,9 @@
 package CriptoVision.Cripto.Repository;
 
 import CriptoVision.Cripto.domain.Variacao;
-import org.springframework.data.repository.CrudRepository;
-import org.springframework.stereotype.Repository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-@Repository
-public interface VariacaoRepository extends CrudRepository<Variacao, Integer> {
+
+public interface VariacaoRepository extends JpaRepository<Variacao, Integer> {
+    public Variacao findFirstByOrderByIdDesc();
 }
