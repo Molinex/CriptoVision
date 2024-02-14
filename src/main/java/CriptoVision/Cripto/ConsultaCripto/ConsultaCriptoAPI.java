@@ -16,7 +16,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
+import javax.sound.sampled.*;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -106,7 +109,7 @@ public class ConsultaCriptoAPI {
             listaMoedas.add(moeda);
 
             //Gravação no BD - BTC
-            if (i == 0) {
+            if (moeda.getNome().equals("Solana")) {
                 JSONObject objetoBD = data.getJSONObject(i);
                 variacao.setNomeCripto(objetoBD.getString("name"));
                 variacao.setPrecoBase(objetoBD.getJSONObject("quote").getJSONObject("USD").getBigDecimal("price"));
@@ -124,9 +127,27 @@ public class ConsultaCriptoAPI {
                 BigDecimal precoAPI = objetoBD.getJSONObject("quote").getJSONObject("USD").getBigDecimal("price");
                 BigDecimal precoBase = variacaoBD.getPrecoBase();
                 BigDecimal variacaoExternaAtual = precoAPI.subtract(precoBase).divide(precoBase, 4, BigDecimal.ROUND_HALF_UP).multiply(new BigDecimal(100));
+                BigDecimal valorAlerta = variacaoBD.getVariacaoBase().add(variacaoExternaAtual);
 
+                variacao.setValorAlerta(valorAlerta);
                 variacao.setVariacaoBase(variacaoExternaAtual);
-                variacao.setValorAlerta(variacaoBD.getValorAlerta());
+
+                if(valorAlerta.compareTo(new BigDecimal(1)) > 0){
+
+                }
+                if (valorAlerta.compareTo(new BigDecimal(2)) > 0) {
+                    System.out.println("O valor é maior que 2%");
+                    alerta("compra");
+                    System.out.println("COMPRE!!!");
+                } else if (valorAlerta.compareTo(new BigDecimal(-1)) < 0) {
+                    System.out.println("O valor é menor que -1%");
+                    System.out.println("VENDA!!!");
+                    alerta("venda");
+                } else {
+                    System.out.println("O valor está entre +2% e -1%");
+                    System.out.println("MANTENHA!!!");
+                }
+
 
                 repository.save(variacao);
             }
@@ -143,6 +164,25 @@ public class ConsultaCriptoAPI {
 //        return moedas.getMoedas();
         //-----
 
+    }
+
+    private String alerta(String alerta) { //todo Ver uma forma de usar o som direto da pasta do projeto sem precisar do caminho inteiro
+        try {
+            URL oUrl = new URL("file:///C:/Users/Molina/Desktop/Desenvolvimento/Projeto_Cripto/CriptoVision/src/main/resources/sons/" + alerta + ".wav");
+            Clip oClip = AudioSystem.getClip();
+            AudioInputStream oStream = AudioSystem.getAudioInputStream(oUrl);
+            oClip.open(oStream);
+            oClip.loop(0);
+        } catch (LineUnavailableException e) {
+            return "";
+        } catch (IOException e) {
+            return "";
+        } catch (UnsupportedAudioFileException e) {
+            return "";
+        }
+
+
+        return "";
     }
 
     private Variacao buscaVariacaoBD() {
