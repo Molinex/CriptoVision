@@ -2,6 +2,7 @@ package CriptoVision.Cripto.ConsultaCripto;
 
 import CriptoVision.Cripto.Repository.VariacaoRepository;
 import CriptoVision.Cripto.domain.Moeda;
+import CriptoVision.Cripto.domain.MoedaBinance;
 import CriptoVision.Cripto.domain.Moedas;
 import CriptoVision.Cripto.domain.Variacao;
 import org.json.JSONArray;
@@ -9,10 +10,7 @@ import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
@@ -21,6 +19,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 @RestController
@@ -85,7 +84,7 @@ public class ConsultaCriptoAPI {
         Variacao variacao = new Variacao();
 
         String conteudo = response.toString();
-        conteudo = conteudo.replace("<200,", "");
+        conteudo = conteudo.replace("<200,", ""); //todo isso aqui acontece, porque precisa pegar o response.getBody() e não o reponse direto
         conteudo = conteudo.replace(">", "");
 
         // Converte o conteúdo em JSON
@@ -114,7 +113,7 @@ public class ConsultaCriptoAPI {
                 variacao.setNomeCripto(objetoBD.getString("name"));
                 variacao.setPrecoBase(objetoBD.getJSONObject("quote").getJSONObject("USD").getBigDecimal("price"));
 
-                //SELECT ultimo BTC gravado
+                //SELECT ultima moeda gravada
                 Variacao variacaoBD = buscaVariacaoBD();
 
                 if (variacaoBD == null) {
@@ -132,22 +131,23 @@ public class ConsultaCriptoAPI {
                 variacao.setValorAlerta(valorAlerta);
                 variacao.setVariacaoBase(variacaoExternaAtual);
 
-                if(valorAlerta.compareTo(new BigDecimal(1)) > 0){
+                Date dataHoraAtual = new Date();
 
-                }
                 if (valorAlerta.compareTo(new BigDecimal(2)) > 0) {
                     System.out.println("O valor é maior que 2%");
+                    System.out.println("Hora: " + dataHoraAtual.getHours()+ ":" + dataHoraAtual.getMinutes());
                     alerta("compra");
-                    System.out.println("COMPRE!!!");
+                    System.out.println("COMPRE!!! => Variação: " + valorAlerta);
                 } else if (valorAlerta.compareTo(new BigDecimal(-1)) < 0) {
                     System.out.println("O valor é menor que -1%");
-                    System.out.println("VENDA!!!");
+                    System.out.println("Hora: " + dataHoraAtual.getHours()+ ":" + dataHoraAtual.getMinutes());
+                    System.out.println("VENDA!!! => Variação: " + valorAlerta);
                     alerta("venda");
                 } else {
                     System.out.println("O valor está entre +2% e -1%");
-                    System.out.println("MANTENHA!!!");
+                    System.out.println("Hora: " + dataHoraAtual.getHours()+ ":" + dataHoraAtual.getMinutes());
+                    System.out.println("MANTENHA!!! => Variação: " + valorAlerta);
                 }
-
 
                 repository.save(variacao);
             }
@@ -155,16 +155,38 @@ public class ConsultaCriptoAPI {
         moedas.setMoedas(listaMoedas);
         return moedas.getMoedas();
 
-
-        // ----
-//        Moedas moedas = new Moedas();
-//        moedas = preencheMoedasFake(moedas);
-//        Variacao variacaoBD = buscaVariacaoBD();
-//        System.out.println(variacaoBD.toString());
-//        return moedas.getMoedas();
-        //-----
-
     }
+
+    @GetMapping(value = "/listaCriptosBinance")
+    public String getListaCriptosBinance() {
+        // A ideia é varrer toda alista e depois trocar pelo nome, Contudo irá retornar uma só Moeda
+        String url = "https://api1.binance.com/api/v3/ticker/24hr";
+
+        RestTemplate restTemplate = new RestTemplate();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        HttpEntity<String> entity = new HttpEntity<>("parameters", headers);
+
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
+
+        String resposta = response.getBody(); //todo surround o método
+        JSONArray respostaJson = new JSONArray(resposta);
+        MoedaBinance moedaBinance = new MoedaBinance();
+
+        for (int i = 0; i < respostaJson.length(); i++){
+            JSONObject respostaAux = respostaJson.getJSONObject(i);
+            //todo só falta adicionar ao banco, fazer a rotina de comparação e adicionar o alerta sonoro
+            if(respostaAux.getString("symbol").equals("SOLUSDT")){
+                moedaBinance.setNomeMoeda(respostaAux.getString("symbol"));
+                moedaBinance.setPercentual24h(respostaAux.getBigDecimal("priceChangePercent"));
+                moedaBinance.setValor(respostaAux.getBigDecimal("lastPrice")); //todo confirmar
+            }
+        }
+
+        return resposta;
+}
 
     private String alerta(String alerta) { //todo Ver uma forma de usar o som direto da pasta do projeto sem precisar do caminho inteiro
         try {
@@ -175,46 +197,17 @@ public class ConsultaCriptoAPI {
             oClip.loop(0);
         } catch (LineUnavailableException e) {
             return "";
-        } catch (IOException e) {
+        } catch (IOException e) { //todo tratar esses exceptions
             return "";
         } catch (UnsupportedAudioFileException e) {
             return "";
         }
-
 
         return "";
     }
 
     private Variacao buscaVariacaoBD() {
         return repository.findFirstByOrderByIdDesc();
-    }
-
-    private Moedas preencheMoedasFake(Moedas moedasParam) {
-        Moedas listaMoedas = new Moedas();
-
-        List<Moeda> moedas = new ArrayList<>();
-
-        Moeda moeda1 = new Moeda();
-        moeda1.setNome("BitFake");
-        moeda1.setUltimaHora(BigDecimal.valueOf(-0.19475947));
-        moeda1.setVinteQuatroHoras(BigDecimal.valueOf(4.63687383));
-        moeda1.setSeteDias(BigDecimal.valueOf(10.48645335));
-        moeda1.setTrintaDias(BigDecimal.valueOf(3.61039286));
-        moeda1.setPrecoAtual(BigDecimal.valueOf(47501.00551688974));
-        moedas.add(moeda1);
-
-        Moeda moeda2 = new Moeda();
-        moeda2.setNome("BNBFake");
-        moeda2.setUltimaHora(BigDecimal.valueOf(0.33804611));
-        moeda2.setVinteQuatroHoras(BigDecimal.valueOf(2.96765624));
-        moeda2.setSeteDias(BigDecimal.valueOf(8.95617728));
-        moeda2.setTrintaDias(BigDecimal.valueOf(-0.62560553));
-        moeda2.setPrecoAtual(BigDecimal.valueOf(2501.9794796899523));
-        moedas.add(moeda2);
-
-        listaMoedas.setMoedas(moedas);
-
-        return listaMoedas;
     }
 
 }
