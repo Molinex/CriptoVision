@@ -7,8 +7,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class CriptoVisionApplication {
     public static void main(String[] args) {
         SpringApplication.run(CriptoVisionApplication.class, args);
-
 		System.out.println("Sistema Subiu!!!");
     }
-
 }

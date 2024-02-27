@@ -1,10 +1,8 @@
 package CriptoVision.Cripto.ConsultaCripto;
 
+import CriptoVision.Cripto.Repository.PercentualRepository;
 import CriptoVision.Cripto.Repository.VariacaoRepository;
-import CriptoVision.Cripto.domain.Moeda;
-import CriptoVision.Cripto.domain.MoedaBinance;
-import CriptoVision.Cripto.domain.Moedas;
-import CriptoVision.Cripto.domain.Variacao;
+import CriptoVision.Cripto.domain.*;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -29,7 +27,10 @@ public class ConsultaCriptoAPI {
     Logger log = LoggerFactory.getLogger(ConsultaCriptoAPI.class);
 
     @Autowired
-    private VariacaoRepository repository;
+    private VariacaoRepository variacaoRepository;
+
+    @Autowired
+    private PercentualRepository percentualRepository;
 
     @GetMapping(value = "/listaCriptos")
     public Moedas getListaCriptos(@RequestHeader(value = "X-CMC_PRO_API_KEY") String chaveCoinMkt) {
@@ -119,7 +120,7 @@ public class ConsultaCriptoAPI {
                 if (variacaoBD == null) {
                     variacao.setValorAlerta(new BigDecimal(0.0));
                     variacao.setVariacaoBase(new BigDecimal(0.0));
-                    repository.save(variacao);
+                    variacaoRepository.save(variacao);
                     return moedas.getMoedas();
                 }
 
@@ -149,7 +150,7 @@ public class ConsultaCriptoAPI {
                     System.out.println("MANTENHA!!! => Variação: " + valorAlerta);
                 }
 
-                repository.save(variacao);
+                variacaoRepository.save(variacao);
             }
         }
         moedas.setMoedas(listaMoedas);
@@ -157,9 +158,10 @@ public class ConsultaCriptoAPI {
 
     }
 
+    BigDecimal variavelGlobal = null;
+
     @GetMapping(value = "/listaCriptosBinance")
     public String getListaCriptosBinance() {
-        // A ideia é varrer toda alista e depois trocar pelo nome, Contudo irá retornar uma só Moeda
         String url = "https://api1.binance.com/api/v3/ticker/24hr";
 
         RestTemplate restTemplate = new RestTemplate();
@@ -171,13 +173,15 @@ public class ConsultaCriptoAPI {
 
         ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, entity, String.class);
 
-        String resposta = response.getBody(); //todo surround o método
+        String resposta = response.getBody(); //TODO adicionar vários métodos para melhorar a legibilidade
         JSONArray respostaJson = new JSONArray(resposta);
         MoedaBinance moedaBinance = new MoedaBinance();
+        Percentual percentualBD = buscaMoedaBinanceBD();
+
 
         for (int i = 0; i < respostaJson.length(); i++){
             JSONObject respostaAux = respostaJson.getJSONObject(i);
-            //todo só falta adicionar ao banco, fazer a rotina de comparação e adicionar o alerta sonoro
+            //todo só falta adicionar o alerta sonoro
             if(respostaAux.getString("symbol").equals("SOLUSDT")){
                 moedaBinance.setNomeMoeda(respostaAux.getString("symbol"));
                 moedaBinance.setPercentual24h(respostaAux.getBigDecimal("priceChangePercent"));
@@ -185,8 +189,88 @@ public class ConsultaCriptoAPI {
             }
         }
 
+        if(percentualBD == null){
+            percentualBD = new Percentual();
+            percentualBD.setValor(moedaBinance.getValor());
+            percentualBD.setPercentual24h(moedaBinance.getPercentual24h());
+            percentualBD.setNomeMoeda(moedaBinance.getNomeMoeda());
+            percentualBD.setAlerta(new BigDecimal(0.0));
+            percentualBD.setVariacao(new BigDecimal(0.0));
+            percentualRepository.save(percentualBD);
+            return resposta;
+        }
+
+        Percentual percentual = new Percentual();
+        percentual.setNomeMoeda(moedaBinance.getNomeMoeda());
+        percentual.setValor(moedaBinance.getValor());
+        percentual.setPercentual24h(moedaBinance.getPercentual24h());
+
+        //ESTRATÉGIA - VARIAÇÃO DO PERCENTUAL >2% COMPRA < -1% VENDE(DO MAIOR VALOR ATINGIDO)
+        BigDecimal valorBD = percentualBD.getValor();
+        BigDecimal valorAtual = percentual.getValor();
+
+        BigDecimal alerta = valorBD.divide(valorAtual, 4, BigDecimal.ROUND_HALF_UP).subtract(new BigDecimal(1.0)).multiply(new BigDecimal(100));
+        System.out.println("Alerta: " + alerta.negate().toString() + "%");
+
+        alerta = alerta.negate();
+
+        percentual.setAlerta(alerta);
+
+        BigDecimal variacao = null;
+
+        if(alerta.compareTo(BigDecimal.ZERO) < 0 &&
+        percentualBD.getAlerta().compareTo(BigDecimal.ZERO) < 0){
+            variacao = percentualBD.getVariacao().add(alerta);// --- OK
+        } if (alerta.compareTo(BigDecimal.ZERO) > 0 &&
+                percentualBD.getAlerta().compareTo(BigDecimal.ZERO) > 0){
+            variacao = percentualBD.getVariacao().add(alerta); // --- > OK
+        } else if (variacao == null) {
+            variacao = alerta;
+        }
+
+        percentual.setAlerta(alerta);
+        percentual.setVariacao(variacao);
+
+        if(variavelGlobal == null){
+            variavelGlobal = alerta;
+        }
+
+        if(variacao.compareTo(new BigDecimal("2")) > 0 ){
+            System.out.println("COMPRA!!!"); // vai ficar avisando toda hora enquanto subir, todo analisar
+            System.out.println("Variação: " + variacao);
+
+            if(variavelGlobal.compareTo(alerta) < 0){
+                variavelGlobal = alerta;
+            } else if (variavelGlobal.compareTo(alerta) > 0){
+                BigDecimal diferencaQueda = variavelGlobal.subtract(alerta).negate();
+                BigDecimal menosUmPorcento = new BigDecimal("-1");
+                if(diferencaQueda.compareTo(menosUmPorcento) < 0){
+                    System.out.println("VENDE!!!");
+                    variavelGlobal = alerta;
+                }
+            }
+        } else if(variavelGlobal.compareTo(alerta) > 0) {
+            BigDecimal diferencaQueda = variavelGlobal.subtract(alerta).negate();
+            BigDecimal menosUmPorcento = new BigDecimal("-1");// usar o umporcento de cima he he
+            if (diferencaQueda.compareTo(menosUmPorcento) < 0) {
+                System.out.println("VENDE!!!");
+                variavelGlobal = alerta;
+            }
+        } else if (variacao.compareTo(new BigDecimal("-1")) < 0 ){// usar o umporcento de cima he he
+            System.out.println("VENDE!!!");
+            System.out.println("Variação: " + variacao);
+            variavelGlobal = alerta;
+        }
+        System.out.println("Variação sem movimento: " + variacao);
+
+        percentualRepository.save(percentual);
+
         return resposta;
 }
+
+    private Percentual buscaMoedaBinanceBD() {
+        return percentualRepository.findFirstByOrderByIdAsc();
+    }
 
     private String alerta(String alerta) { //todo Ver uma forma de usar o som direto da pasta do projeto sem precisar do caminho inteiro
         try {
@@ -207,7 +291,7 @@ public class ConsultaCriptoAPI {
     }
 
     private Variacao buscaVariacaoBD() {
-        return repository.findFirstByOrderByIdDesc();
+        return variacaoRepository.findFirstByOrderByIdDesc();
     }
 
 }
