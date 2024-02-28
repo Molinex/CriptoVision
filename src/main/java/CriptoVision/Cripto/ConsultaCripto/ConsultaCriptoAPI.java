@@ -158,7 +158,7 @@ public class ConsultaCriptoAPI {
 
     }
 
-    BigDecimal variavelGlobal = null;
+    BigDecimal variavelGlobal = null; //todo mudar esse nome horrível hauahuauh
 
     @GetMapping(value = "/listaCriptosBinance")
     public String getListaCriptosBinance() {
@@ -181,11 +181,10 @@ public class ConsultaCriptoAPI {
 
         for (int i = 0; i < respostaJson.length(); i++){
             JSONObject respostaAux = respostaJson.getJSONObject(i);
-            //todo só falta adicionar o alerta sonoro
-            if(respostaAux.getString("symbol").equals("SOLUSDT")){
+            if(respostaAux.getString("symbol").equals("TFUELUSDT")){
                 moedaBinance.setNomeMoeda(respostaAux.getString("symbol"));
                 moedaBinance.setPercentual24h(respostaAux.getBigDecimal("priceChangePercent"));
-                moedaBinance.setValor(respostaAux.getBigDecimal("lastPrice")); //todo confirmar
+                moedaBinance.setValor(respostaAux.getBigDecimal("lastPrice"));
             }
         }
 
@@ -236,6 +235,7 @@ public class ConsultaCriptoAPI {
         }
 
         if(variacao.compareTo(new BigDecimal("2")) > 0 ){
+            alerta("compra");
             System.out.println("COMPRA!!!"); // vai ficar avisando toda hora enquanto subir, todo analisar
             System.out.println("Variação: " + variacao);
 
@@ -246,6 +246,7 @@ public class ConsultaCriptoAPI {
                 BigDecimal menosUmPorcento = new BigDecimal("-1");
                 if(diferencaQueda.compareTo(menosUmPorcento) < 0){
                     System.out.println("VENDE!!!");
+                    alerta("venda");
                     variavelGlobal = alerta;
                 }
             }
@@ -254,10 +255,12 @@ public class ConsultaCriptoAPI {
             BigDecimal menosUmPorcento = new BigDecimal("-1");// usar o umporcento de cima he he
             if (diferencaQueda.compareTo(menosUmPorcento) < 0) {
                 System.out.println("VENDE!!!");
+                alerta("venda");
                 variavelGlobal = alerta;
             }
         } else if (variacao.compareTo(new BigDecimal("-1")) < 0 ){// usar o umporcento de cima he he
             System.out.println("VENDE!!!");
+            alerta("venda");
             System.out.println("Variação: " + variacao);
             variavelGlobal = alerta;
         }
